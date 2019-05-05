@@ -124,10 +124,10 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
      * */
 
     private JavaCameraView openCvCameraView;
-    private Mat mask;
     private Mat tmpMat;
-    private Mat emptyMat;
-
+    private Mat zeroMat;
+    private Mat currentMat;
+    private Mat kernel;
     static {
         if (!OpenCVLoader.initDebug()) {
             Log.d(TAG, "OpenCV not loaded");
@@ -148,12 +148,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
     @Override
     public void onCameraViewStarted(int width, int height) {
         tmpMat = new Mat();
-        emptyMat = new Mat();
-
-        mask = new Mat(new Size(width, height), CvType.CV_8U, new Scalar(0));
-        Core.rectangle(mask, new Point(MAXWIDTH / 2 - MAXHEIGHT / 2, 0), new Point(MAXWIDTH / 2 + MAXHEIGHT / 2, MAXHEIGHT), new Scalar(255), -1);
-
-        initModel();
+        zeroMat = new Mat(new Size(width, height), CvType.CV_8U, new Scalar(0));
+        currentMat = new Mat(new Size(width, height), CvType.CV_8U, new Scalar(0));
+        kernel = Imgproc.getStructuringElement(MORPH_RECT, new Size(2, 2));
     }
 
     private void initModel() {
@@ -171,25 +168,9 @@ public class MainActivity extends Activity implements CameraBridgeViewBase.CvCam
 
     @Override
     public Mat onCameraFrame(CameraBridgeViewBase.CvCameraViewFrame inputFrame) {
-        Mat rgbaMat = inputFrame.rgba();
-        Mat rgbMat = tmpMat;
-        emptyMat.copyTo(rgbMat);
-        Imgproc.cvtColor(rgbaMat, rgbMat, Imgproc.COLOR_RGBA2RGB);
-        Mat targetMat = new Mat(rgbMat, new Rect(new Point(MAXWIDTH / 2 - MAXHEIGHT / 2, 0), new Size(MAXWIDTH / 2 + MAXHEIGHT / 2, MAXHEIGHT)));
-        Imgproc.resize(targetMat, targetMat, new Size(128, 128));
-
-        List<TensorFlowLiteDetector.Recognition> results = detector.detectImage(targetMat);
-
-        rgbaMat.copyTo(rgbMat, mask);
-
-        Message message = new Message();
-        Bundle bundle = new Bundle();
-        bundle.putString("Result", String.valueOf(results));
-        message.setData(bundle);
-        message.what = 1;
-        displayHandler.sendMessage(message);
-
-        return rgbMat;
+        currentMat.copyTo(tmpMat);
+        Core.rectangle(tmpMat, new Point(MAXWIDTH / 2 - MAXHEIGHT / 2, 0), new Point(MAXWIDTH / 2 + MAXHEIGHT / 2, MAXHEIGHT), new Scalar(255), 3);
+        return tmpMat;
     }
 
     private Handler displayHandler = new Handler() {
